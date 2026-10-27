@@ -6,20 +6,16 @@ import rateLimit from 'express-rate-limit';
 import bcrypt from 'bcryptjs';
 import crypto from 'node:crypto';
 import Razorpay from 'razorpay';
+import ImageKit from 'imagekit';
 import multer from 'multer';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import fs from 'node:fs';
 import mongoose from 'mongoose';
 import { User, Product, Order } from './models.js';
 import { credentialsSchema, productSchema, checkoutSchema } from './validation.js';
 import { issueToken, publicUser, requireAuth, requireAdmin } from './auth.js';
 
 const app = express();
-const uploadDirectory = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../uploads');
-fs.mkdirSync(uploadDirectory, { recursive: true });
 const imageUpload = multer({
-  storage: multer.diskStorage({ destination: uploadDirectory, filename: (req, file, callback) => callback(null, `${crypto.randomUUID()}${path.extname(file.originalname).toLowerCase()}`) }),
+  storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (req, file, callback) => callback(null, ['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype))
 });
@@ -27,11 +23,11 @@ app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 const allowedOrigins = (process.env.CLIENT_URL || 'http://localhost:5173').split(',').map((origin) => origin.trim()).filter(Boolean);
 app.use(cors({ origin: (origin, callback) => !origin || allowedOrigins.includes(origin) ? callback(null, true) : callback(new Error('Origin is not allowed')) }));
 app.use(express.json({ limit: '100kb' }));
-app.use('/uploads', express.static(uploadDirectory));
 app.use('/api/auth', rateLimit({ windowMs: 15 * 60 * 1000, limit: 80 }));
 const asyncRoute = (handler) => (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
 const parse = (schema, value) => schema.safeParse(value);
 const razorpay = process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET ? new Razorpay({ key_id: process.env.RAZORPAY_KEY_ID, key_secret: process.env.RAZORPAY_KEY_SECRET }) : null;
+const imageKit = process.env.IMAGEKIT_PUBLIC_KEY && process.env.IMAGEKIT_PRIVATE_KEY && process.env.IMAGEKIT_URL_ENDPOINT ? new ImageKit({ publicKey: process.env.IMAGEKIT_PUBLIC_KEY, privateKey: process.env.IMAGEKIT_PRIVATE_KEY, urlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT }) : null;
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 app.post('/api/auth/register', asyncRoute(async (req, res) => {
@@ -56,10 +52,12 @@ app.get('/api/products/:id', asyncRoute(async (req, res) => { const product = aw
 app.post('/api/admin/products', requireAuth, requireAdmin, asyncRoute(async (req, res) => { const parsed = parse(productSchema, req.body); console.log(parsed.error); if (!parsed.success) return res.status(400).json({ message: 'Product data is invalid' }); res.status(201).json(await Product.create(parsed.data)); }));
 app.put('/api/admin/products/:id', requireAuth, requireAdmin, asyncRoute(async (req, res) => { const parsed = parse(productSchema.partial(), req.body); if (!parsed.success) return res.status(400).json({ message: 'Product data is invalid' }); const product = await Product.findByIdAndUpdate(req.params.id, parsed.data, { new: true, runValidators: true }); if (!product) return res.status(404).json({ message: 'Product not found' }); res.json(product); }));
 app.delete('/api/admin/products/:id', requireAuth, requireAdmin, asyncRoute(async (req, res) => { await Product.findByIdAndUpdate(req.params.id, { active: false }); res.status(204).end(); }));
-app.post('/api/admin/uploads', requireAuth, requireAdmin, imageUpload.single('image'), (req, res) => {
+app.post('/api/admin/uploads', requireAuth, requireAdmin, imageUpload.single('image'), asyncRoute(async (req, res) => {
   if (!req.file) return res.status(400).json({ message: 'Upload a JPEG, PNG, or WebP image up to 5 MB' });
-  res.status(201).json({ image: `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}` });
-});
+  if (!imageKit) return res.status(503).json({ message: 'Image upload is not configured' });
+  const uploaded = await imageKit.upload({ file: req.file.buffer, fileName: `${crypto.randomUUID()}-${req.file.originalname}` });
+  res.status(201).json({ image: uploaded.url });
+}));
 
 app.post('/api/orders', requireAuth, asyncRoute(async (req, res) => {
   const parsed = parse(checkoutSchema, req.body); if (!parsed.success) return res.status(400).json({ message: 'Please complete all checkout fields' });
