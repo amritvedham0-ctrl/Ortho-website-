@@ -1,0 +1,5 @@
+import { z } from 'zod';
+
+export const credentialsSchema = z.object({ name: z.string().trim().min(2).max(80).optional(), email: z.string().email(), password: z.string().min(8).max(128) });
+export const productSchema = z.object({ name: z.string().trim().min(2), category: z.string().trim().min(2), tag: z.string().trim().min(2), description: z.string().trim().min(5), price: z.coerce.number().positive(), mrp: z.coerce.number().positive().optional(), weight: z.string().trim().min(2), image: z.string().trim().min(1), active: z.boolean().optional() });
+export const checkoutSchema = z.object({ items: z.array(z.object({ productId: z.string(), quantity: z.number().int().min(1).max(20) })).min(1), customer: z.object({ name: z.string().trim().min(2), email: z.string().email(), phone: z.string().trim().min(7).max(20) }), address: z.object({ line1: z.string().trim().min(4), line2: z.string().trim().optional(), city: z.string().trim().min(2), state: z.string().trim().min(2), postalCode: z.string().trim().min(4).max(10) }) });
