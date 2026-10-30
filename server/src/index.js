@@ -38,9 +38,49 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
+const asyncRoute = (handler) => (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
+const safeEqual = (left, right) => {
+  const leftBuffer = Buffer.from(left);
+  const rightBuffer = Buffer.from(right);
+  return leftBuffer.length === rightBuffer.length && crypto.timingSafeEqual(leftBuffer, rightBuffer);
+};
+
+app.post('/api/payments/razorpay/webhook', express.raw({ type: 'application/json' }), asyncRoute(async (req, res) => {
+  const signature = req.headers['x-razorpay-signature'];
+  const eventId = req.headers['x-razorpay-event-id'];
+  const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
+  if (!secret || typeof signature !== 'string' || !Buffer.isBuffer(req.body)) return res.status(400).json({ message: 'Invalid webhook configuration' });
+  const expected = crypto.createHmac('sha256', secret).update(req.body).digest('hex');
+  if (!safeEqual(expected, signature)) return res.status(400).json({ message: 'Invalid webhook signature' });
+
+  let payload;
+  try {
+    payload = JSON.parse(req.body.toString('utf8'));
+  } catch {
+    return res.status(400).json({ message: 'Invalid webhook payload' });
+  }
+  if (!eventId) return res.status(400).json({ message: 'Missing webhook event id' });
+  const payment = payload.payload?.payment?.entity;
+  const razorpayOrderId = payment?.order_id || payload.payload?.order?.entity?.id;
+  if (!razorpayOrderId) return res.json({ received: true });
+
+  const order = await Order.findOne({ razorpayOrderId });
+  if (!order) return res.json({ received: true });
+  const update = { $addToSet: { razorpayWebhookEventIds: eventId } };
+  const webhookFilter = { _id: order._id, razorpayWebhookEventIds: { $ne: eventId } };
+  if (['order.paid', 'payment.captured'].includes(payload.event)) {
+    update.$set = { paymentStatus: 'paid', status: 'placed' };
+    if (payment?.id) update.$set.razorpayPaymentId = payment.id;
+  } else if (payload.event === 'payment.failed' && order.paymentStatus !== 'paid') {
+    webhookFilter.paymentStatus = { $ne: 'paid' };
+    update.$set = { paymentStatus: 'failed' };
+    if (payment?.id) update.$set.razorpayPaymentId = payment.id;
+  }
+  await Order.updateOne(webhookFilter, update);
+  res.json({ received: true });
+}));
 app.use(express.json({ limit: '100kb' }));
 app.use('/api/auth', rateLimit({ windowMs: 15 * 60 * 1000, limit: 80 }));
-const asyncRoute = (handler) => (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
 const parse = (schema, value) => schema.safeParse(value);
 const razorpay = process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET ? new Razorpay({ key_id: process.env.RAZORPAY_KEY_ID, key_secret: process.env.RAZORPAY_KEY_SECRET }) : null;
 const imageKit = process.env.IMAGEKIT_PUBLIC_KEY && process.env.IMAGEKIT_PRIVATE_KEY && process.env.IMAGEKIT_URL_ENDPOINT ? new ImageKit({ publicKey: process.env.IMAGEKIT_PUBLIC_KEY, privateKey: process.env.IMAGEKIT_PRIVATE_KEY, urlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT }) : null;
@@ -77,24 +117,36 @@ app.post('/api/admin/uploads', requireAuth, requireAdmin, imageUpload.single('im
 
 app.post('/api/orders', requireAuth, asyncRoute(async (req, res) => {
   const parsed = parse(checkoutSchema, req.body); if (!parsed.success) return res.status(400).json({ message: 'Please complete all checkout fields' });
+  if (!razorpay) return res.status(503).json({ message: 'Payment gateway is not configured' });
   const products = await Product.find({ _id: { $in: parsed.data.items.map((item) => item.productId) }, active: true });
   const productMap = new Map(products.map((product) => [product._id.toString(), product]));
   const items = parsed.data.items.map((item) => { const product = productMap.get(item.productId); if (!product) throw Object.assign(new Error('A product in your cart is unavailable'), { status: 400 }); return { product: product._id, name: product.name, price: product.price, quantity: item.quantity }; });
-  const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const order = await Order.create({ user: req.user._id, items, customer: parsed.data.customer, address: parsed.data.address, total });
-  if (razorpay) { const paymentOrder = await razorpay.orders.create({ amount: total * 100, currency: 'INR', receipt: order._id.toString() }); order.razorpayOrderId = paymentOrder.id; await order.save(); return res.status(201).json({ order, payment: { id: paymentOrder.id, amount: paymentOrder.amount, currency: paymentOrder.currency, key: process.env.RAZORPAY_KEY_ID } }); }
-  res.status(201).json({ order, payment: null, message: 'Payment gateway is not configured yet' });
+  const total = Number(items.reduce((sum, item) => sum + item.price * item.quantity, 0).toFixed(2));
+  const totalPaise = Math.round(total * 100);
+  const order = await Order.create({ user: req.user._id, items, customer: parsed.data.customer, address: parsed.data.address, total, totalPaise, currency: 'INR' });
+  let paymentOrder;
+  try {
+    paymentOrder = await razorpay.orders.create({ amount: totalPaise, currency: order.currency, receipt: order._id.toString(), notes: { local_order_id: order._id.toString() } });
+  } catch (error) {
+    order.paymentStatus = 'failed';
+    await order.save();
+    throw error;
+  }
+  order.razorpayOrderId = paymentOrder.id;
+  await order.save();
+  res.status(201).json({ order, payment: { id: paymentOrder.id, amount: paymentOrder.amount, currency: paymentOrder.currency, key: process.env.RAZORPAY_KEY_ID } });
 }));
 app.post('/api/orders/:id/verify-payment', requireAuth, asyncRoute(async (req, res) => {
   const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
   const order = await Order.findOne({ _id: req.params.id, user: req.user._id }); if (!order) return res.status(404).json({ message: 'Order not found' });
+  if (!razorpay || !process.env.RAZORPAY_KEY_SECRET || !razorpay_order_id || !razorpay_payment_id || !razorpay_signature || order.razorpayOrderId !== razorpay_order_id) return res.status(400).json({ message: 'Payment verification failed' });
   const expected = crypto.createHmac('sha256', process.env.RAZORPAY_KEY_SECRET).update(`${razorpay_order_id}|${razorpay_payment_id}`).digest('hex');
-  if (expected !== razorpay_signature || order.razorpayOrderId !== razorpay_order_id) return res.status(400).json({ message: 'Payment verification failed' });
-  order.paymentStatus = 'paid'; order.razorpayPaymentId = razorpay_payment_id; await order.save(); res.json({ order });
+  if (!safeEqual(expected, razorpay_signature)) return res.status(400).json({ message: 'Payment verification failed' });
+  order.paymentStatus = 'paid'; order.status = 'placed'; order.razorpayPaymentId = razorpay_payment_id; await order.save(); res.json({ order });
 }));
 app.get('/api/orders', requireAuth, asyncRoute(async (req, res) => res.json(await Order.find({ user: req.user._id }).sort({ createdAt: -1 }))));
 app.get('/api/admin/orders', requireAuth, requireAdmin, asyncRoute(async (req, res) => res.json(await Order.find().populate('user', 'name email').sort({ createdAt: -1 }))));
-app.patch('/api/admin/orders/:id', requireAuth, requireAdmin, asyncRoute(async (req, res) => { const status = ['placed', 'processing', 'shipped', 'delivered', 'cancelled'].includes(req.body.status) ? req.body.status : null; if (!status) return res.status(400).json({ message: 'Invalid order status' }); const order = await Order.findByIdAndUpdate(req.params.id, { status }, { new: true }); if (!order) return res.status(404).json({ message: 'Order not found' }); res.json(order); }));
+app.patch('/api/admin/orders/:id', requireAuth, requireAdmin, asyncRoute(async (req, res) => { const status = ['pending_payment', 'placed', 'processing', 'shipped', 'delivered', 'cancelled'].includes(req.body.status) ? req.body.status : null; if (!status) return res.status(400).json({ message: 'Invalid order status' }); const order = await Order.findByIdAndUpdate(req.params.id, { status }, { new: true }); if (!order) return res.status(404).json({ message: 'Order not found' }); res.json(order); }));
 
 app.use((err, req, res, next) => { console.error(err); if (err instanceof multer.MulterError) return res.status(400).json({ message: err.code === 'LIMIT_FILE_SIZE' ? 'Image must be 5 MB or smaller' : 'Image upload failed' }); res.status(err.status || 500).json({ message: err.status ? err.message : 'Something went wrong on the server' }); });
 const port = process.env.PORT || 5000;
