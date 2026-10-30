@@ -456,6 +456,7 @@ function AdminPanel({ token, products, refresh, orders, notify }) {
                   notify("Order updated");
                 }}
               >
+                <option>pending_payment</option>
                 <option>placed</option>
                 <option>processing</option>
                 <option>shipped</option>
