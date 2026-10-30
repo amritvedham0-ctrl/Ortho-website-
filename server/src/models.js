@@ -25,10 +25,13 @@ const orderSchema = new mongoose.Schema({
   customer: { name: String, email: String, phone: String },
   address: { line1: String, line2: String, city: String, state: String, postalCode: String },
   total: { type: Number, required: true },
-  status: { type: String, enum: ['placed', 'processing', 'shipped', 'delivered', 'cancelled'], default: 'placed' },
+  totalPaise: { type: Number, required: true },
+  currency: { type: String, default: 'INR' },
+  status: { type: String, enum: ['pending_payment', 'placed', 'processing', 'shipped', 'delivered', 'cancelled'], default: 'pending_payment' },
   paymentStatus: { type: String, enum: ['pending', 'paid', 'failed'], default: 'pending' },
   razorpayOrderId: String,
-  razorpayPaymentId: String
+  razorpayPaymentId: String,
+  razorpayWebhookEventIds: { type: [String], default: [] }
 }, { timestamps: true });
 
 export const User = mongoose.model('User', userSchema);
