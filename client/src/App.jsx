@@ -15,18 +15,32 @@ const money = (value) => `₹${value.toLocaleString("en-IN")}`;
 const salePrice = (product) => product.mrp ? product.price : Math.round(product.price * 0.95);
 const originalPrice = (product) => product.mrp || product.price;
 
-const productDetails = (product) => ({
-  ingredients: product.name.toLowerCase().includes("ortho")
-    ? "Traditional Ayurvedic herbs selected for joint and muscle care. See the pack label for the complete ingredient list."
-    : "A nourishing blend inspired by amla, saffron, honey and warming Ayurvedic spices.",
-  benefits: product.name.toLowerCase().includes("ortho")
-    ? ["Supports comfortable movement", "Traditional joint-care herbs", "Made for everyday active living"]
-    : ["Daily vitality and nourishment", "Traditional Ayurvedic ingredients", "A comforting wellness ritual"],
-  usage: product.name.toLowerCase().includes("ortho")
-    ? "Use only as directed on the label or by your Ayurvedic practitioner."
-    : "Take as directed on the label. Enjoy as part of a balanced daily routine.",
-  storage: "Store in a cool, dry place away from direct sunlight. Keep tightly closed."
-});
+const productDetails = (product) => {
+  const isOrtho = product.name.toLowerCase().includes("ortho");
+  return isOrtho
+    ? {
+        ingredients: "हरसिंगार, गुग्गुल, हरजोड़, सुरंजन और अन्य पारम्परिक आयुर्वेदिक जड़ी-बूटियाँ। पूरी सामग्री के लिए पैक का लेबल देखें।",
+        benefits: [
+          "घुटनों, कंधों, कोहनी और एड़ी के जोड़ों के दर्द में राहत दिलाने में सहायक",
+          "गठिया या वात विकार से जुड़ी सूजन, जकड़न और अकड़न कम करने में मददगार",
+          "कमर, गर्दन, मांसपेशियों, ऐंठन और साइटिका से जुड़े दर्द में सहायक",
+          "जोड़ों की जकड़न कम होने से गतिशीलता में सुधार में मदद",
+        ],
+        usage: "आमतौर पर भोजन के बाद हल्के गुनगुने पानी या दूध के साथ दिन में 1 से 2 कैप्सूल लेने की सलाह दी जाती है। चिकित्सक या पैक पर दिए निर्देशों का पालन करें।",
+        precautions: "डायबिटीज, हाई ब्लड प्रेशर, कोई पुरानी बीमारी या नियमित दवाएँ लेने पर शुरू करने से पहले डॉक्टर या आयुर्वेदिक चिकित्सक से सलाह लें। गर्भवती और स्तनपान कराने वाली महिलाएँ बिना चिकित्सीय सलाह इसका सेवन न करें।",
+      }
+    : {
+        ingredients: "अश्वगंधा, कौंच बीज, शतावरी और स्वर्ण भस्म/धातुओं सहित पारम्परिक वाजीकरण जड़ी-बूटियों का मिश्रण। पूरी सामग्री के लिए पैक का लेबल देखें।",
+        benefits: [
+          "शारीरिक कमजोरी और थकान में ऊर्जा व स्टैमिना के लिए सहायक",
+          "कामेच्छा और यौन स्वास्थ्य को बेहतर बनाने में मददगार माना जाता है",
+          "धातु दौर्बल्य, इरेक्टाइल डिसफंक्शन और शीघ्रपतन में आयुर्वेदिक रूप से सहायक",
+          "बढ़ती उम्र से जुड़ी कमजोरी और शिथिलता में सहायक",
+        ],
+        usage: "एक मटर के बराबर मात्रा रात को भोजन के एक घंटे बाद सोने से पहले गुनगुने दूध या गर्म पानी के साथ लेने की सलाह दी जाती है। चिकित्सक या पैक पर दिए निर्देशों का पालन करें।",
+        precautions: "हाई ब्लड प्रेशर, हृदय रोग या डायबिटीज होने पर शुरू करने से पहले आयुर्वेदिक चिकित्सक से सलाह लें।",
+      };
+}
 
 function Modal({ title, children, close }) {
   return (
@@ -106,15 +120,32 @@ function Header({ cartCount, openCart, openAuth, user, logout }) {
   );
 }
 function ProductCard({ product, add, wishlist, toggleWishlist, openDetails }) {
+  const viewDetails = () => openDetails(product);
+  const handleCardKeyDown = (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      viewDetails();
+    }
+  };
   return (
-    <article className="card">
+    <article
+      className="card"
+      onClick={viewDetails}
+      onKeyDown={handleCardKeyDown}
+      tabIndex="0"
+      role="link"
+      aria-label={`View details for ${product.name}`}
+    >
       <div className="product-image">
         <span className="tag">{product.tag}</span>
         <span className="discount-badge">5% OFF</span>
         <button
           className="heart"
           aria-label="Add to wishlist"
-          onClick={() => toggleWishlist(product._id)}
+          onClick={(event) => {
+            event.stopPropagation();
+            toggleWishlist(product._id);
+          }}
           style={{ color: wishlist ? "#9d4a45" : "#b5a075" }}
         >
           {wishlist ? "♥" : "♡"}
@@ -136,18 +167,40 @@ function ProductCard({ product, add, wishlist, toggleWishlist, openDetails }) {
             : "King Kesari Collection"}
         </span>
         <div className="card-actions">
-          <button className="add" onClick={() => add(product)}>ADD TO BAG</button>
-          <button className="details-button" onClick={() => openDetails(product)}>VIEW DETAILS</button>
+          <button
+            className="add"
+            onClick={(event) => {
+              event.stopPropagation();
+              add(product);
+            }}
+          >
+            ADD TO BAG
+          </button>
+          <button
+            className="details-button"
+            onClick={(event) => {
+              event.stopPropagation();
+              viewDetails();
+            }}
+          >
+            VIEW DETAILS
+          </button>
         </div>
       </div>
     </article>
   );
 }
-function ProductDetailsModal({ product, close, add, buyNow }) {
+function ProductDetailsPage({ product, back, add, buyNow }) {
   const details = productDetails(product);
   return (
-    <Modal title={product.name} close={close}>
-      <div className="product-detail">
+    <section className="product-page">
+      <button className="back-button" onClick={back}>← वापस सभी उत्पादों पर जाएँ</button>
+      <div className="product-page-header">
+        <div className="kicker">PRODUCT DETAILS</div>
+        <h1>{product.name}</h1>
+        <p>आयुर्वेदिक देखभाल और रोज़मर्रा के स्वास्थ्य के लिए thoughtfully crafted wellness.</p>
+      </div>
+      <div className="product-detail product-detail-page">
         <img src={product.image} alt={product.name} />
         <div>
           <div className="detail-offer">5% OFF THIS PRODUCT</div>
@@ -158,7 +211,7 @@ function ProductDetailsModal({ product, close, add, buyNow }) {
             <dt>Benefits</dt><dd><ul>{details.benefits.map((benefit) => <li key={benefit}>{benefit}</li>)}</ul></dd>
             <dt>Weight</dt><dd>{product.weight}</dd>
             <dt>Usage</dt><dd>{details.usage}</dd>
-            <dt>Storage</dt><dd>{details.storage}</dd>
+            <dt>सावधानियाँ</dt><dd>{details.precautions}</dd>
             <dt>Manufacturing</dt><dd>Made in India with care. Batch and expiry details are printed on the product pack.</dd>
           </dl>
           <div className="detail-actions">
@@ -167,7 +220,12 @@ function ProductDetailsModal({ product, close, add, buyNow }) {
           </div>
         </div>
       </div>
-    </Modal>
+      <div className="product-contact">
+        <strong>अधिक जानकारी के लिए सम्पर्क करें</strong>
+        <span>वैद्य जसबीर जांगड़ा खेदड़ · 9050986512 · 9053513771</span>
+      </div>
+      <p className="product-disclaimer">यह जानकारी सामान्य उत्पाद जानकारी के लिए है। किसी बीमारी के इलाज या दवा बदलने से पहले योग्य चिकित्सक से परामर्श करें।</p>
+    </section>
   );
 }
 function HeroSlider() {
@@ -588,6 +646,15 @@ export default function App() {
           .catch(() => {});
     }
   }, [token, user]);
+  useEffect(() => {
+    const syncProductFromHash = () => {
+      const match = window.location.hash.match(/^#product\/(.+)$/);
+      setDetailProduct(match ? products.find((product) => product._id === match[1]) || null : null);
+    };
+    syncProductFromHash();
+    window.addEventListener("hashchange", syncProductFromHash);
+    return () => window.removeEventListener("hashchange", syncProductFromHash);
+  }, [products]);
   const visible = useMemo(() => {
     const result = products.filter((p) =>
       `${p.name} ${p.category} ${p.description}`
@@ -612,6 +679,12 @@ export default function App() {
         : [...current, { ...product, price: salePrice(product), quantity: 1 }];
     });
     notify(`${product.name} added to cart`);
+  };
+  const openProduct = (product) => {
+    window.location.hash = `product/${product._id}`;
+  };
+  const closeProduct = () => {
+    window.location.hash = "top";
   };
   const updateCart = (id, quantity) =>
     setCart((current) =>
@@ -642,7 +715,7 @@ export default function App() {
         ? current.map((item) => item._id === product._id ? { ...item, quantity: item.quantity + 1, price: salePrice(product) } : item)
         : [...current, { ...product, price: salePrice(product), quantity: 1 }];
     });
-    setDetailProduct(null);
+    closeProduct();
     if (!token) return setModal("auth");
     setModal("checkout");
   };
@@ -718,6 +791,17 @@ export default function App() {
         logout={logout}
       />
       <main>
+        {detailProduct ? (
+          <ProductDetailsPage
+            product={detailProduct}
+            back={closeProduct}
+            add={(product) => {
+              add(product);
+              closeProduct();
+            }}
+            buyNow={buyNow}
+          />
+        ) : <>
         <HeroSlider />
         <section className="intro">
           <div className="kicker">AMRIT VEDHAM</div>
@@ -764,7 +848,7 @@ export default function App() {
                 product={product}
                 add={add}
                 wishlist={wishlist.includes(product._id)}
-                openDetails={setDetailProduct}
+                openDetails={openProduct}
                 toggleWishlist={(id) =>
                   setWishlist((current) =>
                     current.includes(id)
@@ -801,7 +885,7 @@ export default function App() {
           <div className="about-grid"><div><b>Our vision</b><span>To make authentic Ayurvedic wellness approachable, dependable and part of every Indian home.</span></div><div><b>Our mission</b><span>To honour classical knowledge while delivering consistent quality, clear information and warm customer care.</span></div><div><b>Our commitment</b><span>Responsible sourcing, transparent product details and quality-led manufacturing at every step.</span></div></div>
         </section>
         <section className="expertise" id="expertise">
-          <div className="expertise-photo"><img src="/assets/expert.jpeg" alt="Ayurvedic practitioner portrait" /></div>
+          <div className="expertise-photo"><img src="/public/assets/expert.jpeg" alt="Ayurvedic practitioner portrait" /></div>
           <div><div className="kicker">THE PERSON BEHIND THE PRACTICE</div><h2>Our Ayurvedic Expertise – Vaidya Jasbir <em>(20+ Years of Experience)</em></h2><p>Vaid Jasbir brings more than two decades of hands-on Ayurvedic experience to Amrit Vedham. His approach is grounded in traditional knowledge, careful ingredient selection and a practical understanding of everyday wellness.</p><p>From classical herbs to thoughtfully prepared formulations, his expertise guides our focus on quality, authenticity and products people can trust.</p><div className="expertise-points"><span>✦ Traditional formulation knowledge</span><span>✦ Ingredient-led quality</span><span>✦ Personal, honest guidance</span></div></div>
         </section>
         <section className="info-band"><div><span className="info-icon">❖</span><b>Secure payments</b><small>Protected checkout with Razorpay</small></div><div><span className="info-icon">↗</span><b>Shipping & returns</b><small>Reliable delivery and helpful support</small></div><div><span className="info-icon">✓</span><b>Ayurvedic care</b><small>Thoughtful products, clear information</small></div></section>
@@ -842,6 +926,7 @@ export default function App() {
             notify={notify}
           />
         )}
+        </>}
       </main>
       <footer className="footer" id="contact">
         <div>
@@ -904,7 +989,6 @@ export default function App() {
           submit={submitOrder}
         />
       )}
-      {detailProduct && <ProductDetailsModal product={detailProduct} close={() => setDetailProduct(null)} add={(product) => { add(product); setDetailProduct(null); }} buyNow={buyNow} />}
       <a className="whatsapp" href="https://wa.me/919467151151?text=Hello%20Amrit%20Vedham%2C%20I%20would%20like%20some%20help%20with%20my%20order." target="_blank" rel="noreferrer" aria-label="Chat with Amrit Vedham on WhatsApp">☏<span>Chat with us</span></a>
       <div className={`toast ${toast ? "show" : ""}`} role="status">
         {toast}
