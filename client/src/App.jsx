@@ -221,7 +221,7 @@ function ProductDetailsPage({ product, back, add, buyNow }) {
       </div>
       <div className="product-contact">
         <strong>अधिक जानकारी के लिए सम्पर्क करें</strong>
-        <span>वैद्य जसबीर जांगड़ा खेदड़ · 9050986512 · 9053513771</span>
+        <span>वैद्य जसबीर जांगड़ा · +91 9053513771 · +91 9050986512</span>
       </div>
       <p className="product-disclaimer">यह जानकारी सामान्य उत्पाद जानकारी के लिए है। किसी बीमारी के इलाज या दवा बदलने से पहले योग्य चिकित्सक से परामर्श करें।</p>
     </section>
