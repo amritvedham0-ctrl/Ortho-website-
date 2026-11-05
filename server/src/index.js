@@ -120,7 +120,7 @@ app.post('/api/orders', requireAuth, asyncRoute(async (req, res) => {
   if (!razorpay) return res.status(503).json({ message: 'Payment gateway is not configured' });
   const products = await Product.find({ _id: { $in: parsed.data.items.map((item) => item.productId) }, active: true });
   const productMap = new Map(products.map((product) => [product._id.toString(), product]));
-  const items = parsed.data.items.map((item) => { const product = productMap.get(item.productId); if (!product) throw Object.assign(new Error('A product in your cart is unavailable'), { status: 400 }); const price = product.mrp ? product.price : Math.round(product.price * 0.95); return { product: product._id, name: product.name, price, quantity: item.quantity }; });
+  const items = parsed.data.items.map((item) => { const product = productMap.get(item.productId); if (!product) throw Object.assign(new Error('A product in your cart is unavailable'), { status: 400 }); const price = product.price; return { product: product._id, name: product.name, price, quantity: item.quantity }; });
   const total = Number(items.reduce((sum, item) => sum + item.price * item.quantity, 0).toFixed(2));
   const totalPaise = Math.round(total * 100);
   const order = await Order.create({ user: req.user._id, items, customer: parsed.data.customer, address: parsed.data.address, total, totalPaise, currency: 'INR' });
