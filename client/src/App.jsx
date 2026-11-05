@@ -12,9 +12,7 @@ const initialForm = {
   postalCode: "",
 };
 const money = (value) => `₹${value.toLocaleString("en-IN")}`;
-const salePrice = (product) => product.mrp ? product.price : Math.round(product.price * 0.95);
-const originalPrice = (product) => product.mrp || product.price;
-const whatsappNumber = "919050986512";
+const whatsappNumber = "919053513771";
 const openWhatsApp = (message) => {
   window.location.href = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
 };
@@ -142,7 +140,6 @@ function ProductCard({ product, add, wishlist, toggleWishlist, openDetails }) {
     >
       <div className="product-image">
         <span className="tag">{product.tag}</span>
-        <span className="discount-badge">5% OFF</span>
         <button
           className="heart"
           aria-label="Add to wishlist"
@@ -162,8 +159,7 @@ function ProductCard({ product, add, wishlist, toggleWishlist, openDetails }) {
         <div className="desc">{product.description}</div>
         <div className="weight">{product.weight}</div>
         <div className="price-row">
-          <span className="price">{money(salePrice(product))}</span>
-          <span className="mrp">{money(originalPrice(product))}</span>
+          <span className="price">{money(product.price)}</span>
         </div>
         <span className="saving">
           {product.name.toLowerCase().includes("ortho")
@@ -207,9 +203,8 @@ function ProductDetailsPage({ product, back, add, buyNow }) {
       <div className="product-detail product-detail-page">
         <img src={product.image} alt={product.name} />
         <div>
-          <div className="detail-offer">5% OFF THIS PRODUCT</div>
           <p>{product.description}</p>
-          <div className="detail-price"><strong>{money(salePrice(product))}</strong> <del>{money(originalPrice(product))}</del></div>
+          <div className="detail-price"><strong>{money(product.price)}</strong></div>
           <dl className="spec-list">
             <dt>Ingredients</dt><dd>{details.ingredients}</dd>
             <dt>Benefits</dt><dd><ul>{details.benefits.map((benefit) => <li key={benefit}>{benefit}</li>)}</ul></dd>
@@ -235,8 +230,8 @@ function ProductDetailsPage({ product, back, add, buyNow }) {
 function HeroSlider() {
   const [slide, setSlide] = useState(0);
   const slides = [
-    { image: "/assets/product1.jpeg", eyebrow: "KING KESARI CHYAWANPRASH", title: "A golden daily ritual", copy: "Traditional Ayurvedic nourishment for strength, stamina and vitality.", offer: "GET 5% OFF THIS WEEK" },
-    { image: "/assets/product2.jpeg", eyebrow: "ORTHO AMRIT CAPSULE", title: "Move with confidence", copy: "Thoughtful joint-care support for active everyday living.", offer: "DISCOVER YOUR 5% SAVING" },
+    { image: "/assets/product1.jpeg", eyebrow: "KING KESARI CHYAWANPRASH", title: "A golden daily ritual", copy: "Traditional Ayurvedic nourishment for strength, stamina and vitality.", offer: "SHOP KING KESARI" },
+    { image: "/assets/product2.jpeg", eyebrow: "ORTHO AMRIT CAPSULE", title: "Move with confidence", copy: "Thoughtful joint-care support for active everyday living.", offer: "EXPLORE ORTHO AMRIT" },
   ];
   useEffect(() => {
     const timer = window.setInterval(() => setSlide((current) => (current + 1) % slides.length), 5200);
@@ -680,7 +675,7 @@ export default function App() {
               ? { ...item, quantity: item.quantity + 1 }
               : item,
           )
-        : [...current, { ...product, price: salePrice(product), quantity: 1 }];
+        : [...current, { ...product, price: product.price, quantity: 1 }];
     });
     notify(`${product.name} added to cart`);
   };
@@ -717,7 +712,7 @@ export default function App() {
       `नमस्ते अमृत वेदम,\n\nमुझे यह उत्पाद ऑर्डर करना है:\n` +
       `उत्पाद: ${product.name}\n` +
       `मात्रा: 1\n` +
-      `कीमत: ${money(salePrice(product))}\n` +
+      `कीमत: ${money(product.price)}\n` +
       `वजन: ${product.weight}\n\n` +
       `कृपया उपलब्धता और डिलीवरी की जानकारी साझा करें।`,
     );
@@ -957,7 +952,7 @@ export default function App() {
           submit={submitOrder}
         />
       )}
-      <a className="whatsapp" href="https://wa.me/919467151151?text=Hello%20Amrit%20Vedham%2C%20I%20would%20like%20to%20order%20something." target="_blank" rel="noreferrer" aria-label="Chat with Amrit Vedham on WhatsApp">☏<span>Chat with us</span></a>
+      <a className="whatsapp" href="https://wa.me/919053513771?text=Hello%20Amrit%20Vedham%2C%20I%20would%20like%20to%20order%20something." target="_blank" rel="noreferrer" aria-label="Chat with Amrit Vedham on WhatsApp">☏<span>Chat with us</span></a>
       <div className={`toast ${toast ? "show" : ""}`} role="status">
         {toast}
       </div>
