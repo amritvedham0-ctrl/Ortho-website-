@@ -18,7 +18,31 @@ const openWhatsApp = (message) => {
 };
 
 const productDetails = (product) => {
-  const isOrtho = product.name.toLowerCase().includes("ortho");
+  const productName = product.name.toLowerCase();
+  const isLungsCare =
+    productName.includes("lungs") || productName.includes("फेफड़");
+  const isOrtho = productName.includes("ortho");
+  if (isLungsCare) {
+    return {
+      ingredients:
+        "वासा, मुलेठी, तुलसी, आंवला, गुडुची, पीपली, कर्क्यूमिन, कंटकारी, शुंठी, भूम्यामलकी, तुलसी प्रीमियम एक्सट्रैक्ट ब्लेंड, काकड़ा सिंगी, अतीस मीठा, कायफल, त्रिकटु तथा अन्य सहायक घटक। पूरी सामग्री के लिए पैक का लेबल देखें।",
+      benefits: [
+        "साइनस एवं नाक बंद रहने की समस्या में सहायक देखभाल",
+        "अस्थमा एवं सांस लेने में परेशानी के दौरान सहायक देखभाल",
+        "बार-बार नजला, छींक एवं धूल-मिट्टी से होने वाली एलर्जी में सहायक",
+        "खांसी, जुकाम एवं कफ की समस्या में सहायक",
+        "छाती में घरघराहट एवं सांस लेते समय आवाज आने में सहायक देखभाल",
+        "रात को सोते समय नाक एवं छाती से सांय-सांय की आवाज आने में सहायक देखभाल",
+        "सिर में भारीपन एवं चक्कर महसूस होने में सहायक देखभाल",
+        "श्वसन तंत्र एवं फेफड़ों के स्वास्थ्य की देखभाल",
+      ],
+      weight: "Pack Size: 60 Gm Powder",
+      usage:
+        "आमतौर पर भोजन के बाद 1-1 ग्राम सुबह-शाम आधा गिलास गर्म पानी में मिला कर किया जाता है।",
+      precautions:
+        "डायबिटीज, हाई ब्लड प्रेशर, किसी पुरानी बीमारी या नियमित दवाओं के सेवन की स्थिति में शुरू करने से पहले डॉक्टर या योग्य आयुर्वेदिक चिकित्सक से सलाह लें। गर्भवती एवं स्तनपान कराने वाली महिलाएं चिकित्सकीय सलाह के बिना सेवन न करें।",
+    };
+  }
   return isOrtho
     ? {
         ingredients: "हरसिंगार, गुग्गुल, हरजोड़, सुरंजन और अन्य पारम्परिक आयुर्वेदिक जड़ी-बूटियाँ। पूरी सामग्री के लिए पैक का लेबल देखें।",
@@ -164,7 +188,10 @@ function ProductCard({ product, add, wishlist, toggleWishlist, openDetails }) {
         <span className="saving">
           {product.name.toLowerCase().includes("ortho")
             ? "Ortho Amrit Collection"
-            : "King Kesari Collection"}
+            : product.name.toLowerCase().includes("lungs") ||
+                product.name.toLowerCase().includes("फेफड़")
+              ? "Amrit Lungs Care Collection"
+              : "King Kesari Collection"}
         </span>
         <div className="card-actions">
           <button
@@ -203,12 +230,15 @@ function ProductDetailsPage({ product, back, add, buyNow }) {
       <div className="product-detail product-detail-page">
         <img src={product.image} alt={product.name} />
         <div>
-          <p>{product.description}</p>
+          <section className="product-description">
+            <h2>Product description</h2>
+            <p>{product.description}</p>
+          </section>
           <div className="detail-price"><strong>{money(product.price)}</strong></div>
           <dl className="spec-list">
             <dt>Ingredients</dt><dd>{details.ingredients}</dd>
             <dt>Benefits</dt><dd><ul>{details.benefits.map((benefit) => <li key={benefit}>{benefit}</li>)}</ul></dd>
-            <dt>Weight</dt><dd>{product.weight}</dd>
+            <dt>Weight</dt><dd>{details.weight || product.weight}</dd>
             <dt>Usage</dt><dd>{details.usage}</dd>
             <dt>सावधानियाँ</dt><dd>{details.precautions}</dd>
             <dt>Manufacturing</dt><dd>Made in India with care. Batch and expiry details are printed on the product pack.</dd>
@@ -504,7 +534,6 @@ function AdminPanel({ token, products, refresh, orders, notify }) {
             "name",
             "category",
             "tag",
-            "description",
             "price",
             "weight",
           ].map((field) => (
@@ -517,6 +546,13 @@ function AdminPanel({ token, products, refresh, orders, notify }) {
               onChange={(e) => setForm({ ...form, [field]: e.target.value })}
             />
           ))}
+          <textarea
+            required
+            rows="8"
+            placeholder="Description"
+            value={form.description}
+            onChange={(e) => setForm({ ...form, description: e.target.value })}
+          />
           <label className="file-field">
             Product image
             <input
