@@ -262,6 +262,7 @@ function HeroSlider() {
   const slides = [
     { image: "/assets/product1.jpeg", eyebrow: "KING KESARI CHYAWANPRASH", title: "A golden daily ritual", copy: "Traditional Ayurvedic nourishment for strength, stamina and vitality.", offer: "SHOP KING KESARI" },
     { image: "/assets/product2.jpeg", eyebrow: "ORTHO AMRIT CAPSULE", title: "Move with confidence", copy: "Thoughtful joint-care support for active everyday living.", offer: "EXPLORE ORTHO AMRIT" },
+    { image: "/assets/product3.jpeg", eyebrow: "AMRIT LUNGS CARE", title: "Breathe with ease", copy: "Support for healthy lung function and respiratory wellness.", offer: "EXPLORE AMRIT LUNGS CARE" },
   ];
   useEffect(() => {
     const timer = window.setInterval(() => setSlide((current) => (current + 1) % slides.length), 5200);
